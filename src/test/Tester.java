@@ -34,7 +34,7 @@ public class Tester {
             server.close();
 
         } catch (IOException e) {
-            eventListener.onErrorOccured(e);
+            eventListener.onErrorOccurred(e);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -124,8 +124,8 @@ public class Tester {
         }
 
         @Override
-        public void onErrorOccured(Exception e) {
-            System.out.println("onErrorOccured");
+        public void onErrorOccurred(Exception e) {
+            System.out.println("onErrorOccurred");
             e.printStackTrace();
         }
     };

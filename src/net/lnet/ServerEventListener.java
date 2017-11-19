@@ -15,5 +15,5 @@ public interface ServerEventListener {
 
     void onClientDisconnected(SocketChannel socketChannel, CloseReason closeReason);
 
-    void onErrorOccured(Exception e);
+    void onErrorOccurred(Exception e);
 }

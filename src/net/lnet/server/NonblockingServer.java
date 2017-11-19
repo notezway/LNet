@@ -29,7 +29,7 @@ public class NonblockingServer extends Server {
             try {
                 selectedCount = selector.select();
             } catch (IOException e) {
-                getEventListener().onErrorOccured(e);
+                getEventListener().onErrorOccurred(e);
             }
             if(selectedCount > 0) {
                 Iterator<SelectionKey> keyIterator = selector.selectedKeys().iterator();
@@ -65,7 +65,7 @@ public class NonblockingServer extends Server {
             registerReadable(socketChannel);
             getEventListener().onClientConnected(socketChannel);
         } catch (IOException e) {
-            getEventListener().onErrorOccured(e);
+            getEventListener().onErrorOccurred(e);
         }
     }
 
@@ -75,7 +75,7 @@ public class NonblockingServer extends Server {
                 bufferProcessor.processInput();
             }
         } catch (IOException e) {
-            getEventListener().onErrorOccured(e);
+            getEventListener().onErrorOccurred(e);
         }
     }
 
@@ -86,7 +86,7 @@ public class NonblockingServer extends Server {
                 int bytesWritten = socketChannel.write(bufferProcessor.getOutputBuffer());
                 setWriteInterestOp(socketChannel, bytesWritten < bytesRemaining);
             } catch (IOException e) {
-                getEventListener().onErrorOccured(e);
+                getEventListener().onErrorOccurred(e);
             }
         }
     }
@@ -104,7 +104,7 @@ public class NonblockingServer extends Server {
             selectableChannel.configureBlocking(false);
             return selectableChannel.register(selector, selectorOps);
         } catch (IOException e) {
-            getEventListener().onErrorOccured(e);
+            getEventListener().onErrorOccurred(e);
         }
         return null;
     }
@@ -129,7 +129,7 @@ public class NonblockingServer extends Server {
         try {
             selectableChannel.close();
         } catch (IOException e) {
-            getEventListener().onErrorOccured(e);
+            getEventListener().onErrorOccurred(e);
         }
         selectableChannel.keyFor(selector).cancel();
         if(selectableChannel instanceof SocketChannel) {
