@@ -125,7 +125,7 @@ public class NonblockingServer extends Server {
         register(serverSocketChannel, SelectionKey.OP_ACCEPT);
     }
 
-    public void closeAfterSelect(SelectableChannel selectableChannel, CloseReason closeReason) {
+    public void close(SelectableChannel selectableChannel, CloseReason closeReason) {
         try {
             selectableChannel.close();
         } catch (IOException e) {
@@ -140,7 +140,7 @@ public class NonblockingServer extends Server {
     public void closeAllChannels(CloseReason closeReason) {
         synchronized (selector.keys()) {
             for (SelectionKey selectionKey : selector.keys()) {
-                closeAfterSelect(selectionKey.channel(), closeReason);
+                close(selectionKey.channel(), closeReason);
             }
         }
     }

@@ -39,7 +39,7 @@ public abstract class Server implements Runnable, Closeable {
 
     abstract public void registerAcceptable(ServerSocketChannel serverSocketChannel);
 
-    abstract public void closeAfterSelect(SelectableChannel selectableChannel, CloseReason closeReason);
+    abstract public void close(SelectableChannel selectableChannel, CloseReason closeReason);
 
     abstract public void closeAllChannels(CloseReason closeReason);
 
