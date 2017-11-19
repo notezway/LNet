@@ -31,7 +31,7 @@ public class NonblockingServer extends Server {
             } catch (IOException e) {
                 getEventListener().onErrorOccurred(e);
             }
-            if(selectedCount > 0) {
+            if(selector.isOpen() && selectedCount > 0) {
                 Iterator<SelectionKey> keyIterator = selector.selectedKeys().iterator();
                 while(keyIterator.hasNext()) {
                     processKey(keyIterator.next());

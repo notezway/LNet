@@ -30,6 +30,8 @@ public class Tester {
             Thread.sleep(3000);
             processorProvider.map.get(socketChannel.getRemoteAddress()).getRegisteredWriteCallback().write();
             Thread.sleep(3000);
+            server.close(socketChannel, null);
+            Thread.sleep(1000);
             //server.close(serverSocketChannel, null);
             server.close();
 
