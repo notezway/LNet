@@ -11,9 +11,9 @@ public interface ServerEventListener {
 
     void onServerClosed(CloseReason closeReason);
 
-    void onClientConnected(SocketChannel socketChannel);
+    void onSocketChannelOpen(SocketChannel socketChannel);
 
-    void onClientDisconnected(SocketChannel socketChannel, CloseReason closeReason);
+    void onSocketChannelClosed(SocketChannel socketChannel, CloseReason closeReason);
 
     void onErrorOccurred(Exception e);
 }

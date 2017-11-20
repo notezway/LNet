@@ -1,4 +1,6 @@
-package net.lnet;
+package net.lnet.processor;
+
+import net.lnet.WriteCallback;
 
 import java.nio.ByteBuffer;
 
@@ -16,7 +18,11 @@ public interface BufferProcessor {
 
     void processInput();
 
-    int processOutput();
+    void processOutput();
+
+    int getBytesRemaining();
 
     ByteBuffer getOutputBuffer();
+
+    void close();
 }

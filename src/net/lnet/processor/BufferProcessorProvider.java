@@ -1,4 +1,4 @@
-package net.lnet;
+package net.lnet.processor;
 
 import java.nio.channels.SocketChannel;
 

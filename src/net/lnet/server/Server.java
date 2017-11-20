@@ -1,6 +1,6 @@
 package net.lnet.server;
 
-import net.lnet.BufferProcessorProvider;
+import net.lnet.processor.BufferProcessorProvider;
 import net.lnet.CloseReason;
 import net.lnet.ServerEventListener;
 
@@ -41,7 +41,7 @@ public abstract class Server implements Runnable, Closeable {
 
     abstract public void close(SelectableChannel selectableChannel, CloseReason closeReason);
 
-    abstract public void closeAllChannels(CloseReason closeReason);
+    abstract public void closeAllChannels(CloseReason closeReason, boolean immediately);
 
     abstract public void closeAfterSelect(CloseReason closeReason) throws IOException;
 

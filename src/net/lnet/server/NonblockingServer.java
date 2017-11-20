@@ -1,9 +1,9 @@
 package net.lnet.server;
 
-import net.lnet.BufferProcessor;
-import net.lnet.BufferProcessorProvider;
 import net.lnet.CloseReason;
 import net.lnet.ServerEventListener;
+import net.lnet.processor.BufferProcessor;
+import net.lnet.processor.BufferProcessorProvider;
 
 import java.io.IOException;
 import java.nio.channels.*;
@@ -63,7 +63,7 @@ public class NonblockingServer extends Server {
         try {
             SocketChannel socketChannel = serverSocketChannel.accept();
             registerReadable(socketChannel);
-            getEventListener().onClientConnected(socketChannel);
+            getEventListener().onSocketChannelOpen(socketChannel);
         } catch (IOException e) {
             getEventListener().onErrorOccurred(e);
         }
@@ -80,7 +80,8 @@ public class NonblockingServer extends Server {
     }
 
     private void write(SocketChannel socketChannel, BufferProcessor bufferProcessor) {
-        int bytesRemaining = bufferProcessor.processOutput();
+        bufferProcessor.processOutput();
+        int bytesRemaining = bufferProcessor.getBytesRemaining();
         if(bytesRemaining > 0) {
             try {
                 int bytesWritten = socketChannel.write(bufferProcessor.getOutputBuffer());
@@ -126,18 +127,27 @@ public class NonblockingServer extends Server {
     }
 
     public void close(SelectableChannel selectableChannel, CloseReason closeReason) {
+        SelectionKey selectionKey = selectableChannel.keyFor(selector);
+        boolean alreadyCanceled = !selectionKey.isValid();
         try {
             selectableChannel.close();
         } catch (IOException e) {
             getEventListener().onErrorOccurred(e);
         }
-        selectableChannel.keyFor(selector).cancel();
+        selectionKey.cancel();
         if(selectableChannel instanceof SocketChannel) {
-            getEventListener().onClientDisconnected((SocketChannel) selectableChannel, closeReason);
+            ((BufferProcessor) selectionKey.attachment()).close();
+            SocketChannel socketChannel = (SocketChannel) selectableChannel;
+            if(!alreadyCanceled) {
+                getEventListener().onSocketChannelClosed(socketChannel, closeReason);
+            }
         }
     }
 
-    public void closeAllChannels(CloseReason closeReason) {
+    public void closeAllChannels(CloseReason closeReason, boolean immediately) {
+        if(immediately) {
+            selector.wakeup();
+        }
         synchronized (selector.keys()) {
             for (SelectionKey selectionKey : selector.keys()) {
                 close(selectionKey.channel(), closeReason);
@@ -147,12 +157,13 @@ public class NonblockingServer extends Server {
 
     @Override
     public void close() throws IOException {
+        closeAllChannels(null, true);
         selector.close();
         super.close();
     }
 
     public void closeAfterSelect(CloseReason closeReason) throws IOException {
-        closeAllChannels(closeReason);
+        closeAllChannels(closeReason, false);
         selector.close();
         super.close();
     }
