@@ -6,6 +6,7 @@ import net.lnet.processor.BufferProcessor;
 import net.lnet.processor.BufferProcessorProvider;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.nio.channels.*;
 import java.util.Iterator;
 
@@ -15,6 +16,7 @@ import java.util.Iterator;
 public class NonblockingServer extends Server {
 
     private final Selector selector;
+    private volatile boolean tcpNoDelay = false;
 
     public NonblockingServer(BufferProcessorProvider processorProvider, ServerEventListener eventListener) throws IOException {
         super(processorProvider, eventListener);
@@ -115,6 +117,11 @@ public class NonblockingServer extends Server {
 
     public void registerReadable(SocketChannel socketChannel) {
         SelectionKey selectionKey = register(socketChannel, SelectionKey.OP_READ);
+        try {
+            socketChannel.socket().setTcpNoDelay(tcpNoDelay);
+        } catch (SocketException e) {
+            getEventListener().onErrorOccurred(e);
+        }
         if(selectionKey != null) {
             BufferProcessor bufferProcessor = getProcessorProvider().getNewBufferProcessor(socketChannel);
             bufferProcessor.registerWriteCallback(() -> NonblockingServer.this.write(socketChannel, bufferProcessor));
@@ -124,6 +131,14 @@ public class NonblockingServer extends Server {
 
     public void registerAcceptable(ServerSocketChannel serverSocketChannel) {
         register(serverSocketChannel, SelectionKey.OP_ACCEPT);
+    }
+
+    public void configureNoDelay(boolean noDelay) {
+        tcpNoDelay = noDelay;
+    }
+
+    public boolean getNoDelay() {
+        return tcpNoDelay;
     }
 
     public void close(SelectableChannel selectableChannel, CloseReason closeReason) {

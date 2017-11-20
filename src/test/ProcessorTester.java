@@ -7,6 +7,8 @@ public class ProcessorTester {
 
     public static void main(String[] args) throws InterruptedException {
 
+        final String[] s = {""};
+
         final Object lock = new Object();
 
         Runnable runnable = () -> {
@@ -15,7 +17,7 @@ public class ProcessorTester {
                     lock.wait();
                 } catch (InterruptedException ignored) {
                 } finally {
-                    System.out.println("After wait");
+                    s[0] += "1";
                 }
             }
         };
@@ -24,10 +26,18 @@ public class ProcessorTester {
 
         thread.start();
 
-        Thread.sleep(2000);
+        Thread.sleep(1000);
 
         synchronized (lock) {
             lock.notify();
+            s[0] += "2";
+            thread.join();
+            s[0] += "3";
         }
+        synchronized (lock) {
+            s[0] += "4";
+        }
+        Thread.sleep(500);
+        System.out.println(s[0]);
     }
 }

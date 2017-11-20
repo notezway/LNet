@@ -38,7 +38,10 @@ public abstract class AsynchronousBufferProcessor implements BufferProcessor {
                         outputBuffer.wait();
                     } catch (InterruptedException ignored) {
                     } finally {
-                        asynchronousProcessOutput();
+                        if(!needStop) {
+                            asynchronousProcessOutput();
+                            initiateOutputWrite();
+                        }
                     }
                 }
             }

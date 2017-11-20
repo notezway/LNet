@@ -23,6 +23,8 @@ public class ServerTester {
 
     public static void main(String[] args) {
         try {
+
+            System.out.println(1 << 16);
             Server server = new NonblockingServer(asyncProcessorProvider, eventListener);
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open().bind(new InetSocketAddress(5656));
             server.registerAcceptable(serverSocketChannel);
@@ -30,11 +32,11 @@ public class ServerTester {
             server.registerReadable(socketChannel);
             Thread serverThread = new Thread(server);
             serverThread.start();
-            Thread.sleep(3000);
-            asyncProcessorProvider.map.get(socketChannel.getRemoteAddress()).getRegisteredWriteCallback().write();
-            Thread.sleep(3000);
-            server.close(socketChannel, null);
             Thread.sleep(1000);
+            asyncProcessorProvider.map.get(socketChannel.getRemoteAddress()).getRegisteredWriteCallback().write();
+            Thread.sleep(2000);
+            server.close(socketChannel, null);
+            Thread.sleep(500);
             //server.close(serverSocketChannel, null);
             server.close();
 
@@ -48,6 +50,7 @@ public class ServerTester {
     static class AsyncBufferProcessorProvider implements BufferProcessorProvider {
 
         Map<SocketAddress, BufferProcessor> map = new HashMap<>();
+        int bytesRemaining = 0;
 
         @Override
         public BufferProcessor getNewBufferProcessor(SocketChannel socketChannel) {
@@ -64,11 +67,14 @@ public class ServerTester {
                     outputBuffer.clear();
                     outputBuffer.put(new byte[(int)(1 + Math.random() * 10)]);
                     outputBuffer.flip();
+                    bytesRemaining = outputBuffer.limit();
                 }
 
                 @Override
                 protected int asynchronousGetBytesRemaining() {
-                    return outputBuffer.limit();
+                    int ret = bytesRemaining;
+                    bytesRemaining = 0;
+                    return ret;
                 }
             };
             try {
