@@ -5,5 +5,6 @@ package net.lnet;
  */
 public interface WriteCallback {
 
-    void write();
+    //return: true if all bytes written to socket, otherwise false
+    boolean write();
 }

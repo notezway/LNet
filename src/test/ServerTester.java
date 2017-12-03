@@ -4,6 +4,7 @@ import net.lnet.*;
 import net.lnet.processor.AsynchronousBufferProcessor;
 import net.lnet.processor.BufferProcessor;
 import net.lnet.processor.BufferProcessorProvider;
+import net.lnet.processor.PacketBufferProcessor;
 import net.lnet.server.NonblockingServer;
 import net.lnet.server.Server;
 
@@ -15,28 +16,47 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Created by slimon on 19-11-17.
  */
 public class ServerTester {
 
+    public static String out = "";
+
     public static void main(String[] args) {
         try {
 
-            System.out.println(1 << 16);
-            Server server = new NonblockingServer(asyncProcessorProvider, eventListener);
+            //System.out.println(1 << 16);
+            Server server = new NonblockingServer(packetProcessorProvider, eventListener);
             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open().bind(new InetSocketAddress(5656));
             server.registerAcceptable(serverSocketChannel);
             SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress("localhost", 5656));
             server.registerReadable(socketChannel);
             Thread serverThread = new Thread(server);
+            serverThread.setDaemon(true);
             serverThread.start();
             Thread.sleep(1000);
-            asyncProcessorProvider.map.get(socketChannel.getRemoteAddress()).getRegisteredWriteCallback().write();
-            Thread.sleep(2000);
-            server.close(socketChannel, null);
+            String s = "ololo";
+            Random random = new Random();
+            byte[] arr = new byte[(1 << 16) - 5];
+            random.nextBytes(arr);
+            packetProcessorProvider.map.get(socketChannel.getRemoteAddress()).sendPacket(0, ByteBuffer.wrap(arr));
+            /*for(int i = 0; i < 5000; i++) {
+                packetProcessorProvider.map.get(socketChannel.getRemoteAddress()).sendPacket(i, ByteBuffer.wrap((s).getBytes()));
+                //Thread.yield();
+                s += "" + i;
+                if(s.length() > (1 << 16) - 5) break;
+            }*/
+            /*packetProcessorProvider.map.get(socketChannel.getRemoteAddress()).sendPacket(1, ByteBuffer.wrap("ololo1".getBytes()));
             Thread.sleep(500);
+            packetProcessorProvider.map.get(socketChannel.getRemoteAddress()).sendPacket(2, ByteBuffer.wrap("ololo2".getBytes()));*/
+            //asyncProcessorProvider.map.get(socketChannel.getRemoteAddress()).getRegisteredWriteCallback().write();
+            Thread.sleep(2000);
+            //System.out.println(out);
+            //server.close(socketChannel, null, false);
+            //Thread.sleep(500);
             //server.close(serverSocketChannel, null);
             server.close();
 
@@ -44,6 +64,39 @@ public class ServerTester {
             eventListener.onErrorOccurred(e);
         } catch (InterruptedException e) {
             e.printStackTrace();
+        }
+    }
+
+    static class PacketBufferProcessorProvider implements BufferProcessorProvider {
+
+        Map<SocketAddress, PacketBufferProcessor> map = new HashMap<>();
+
+        @Override
+        public BufferProcessor getNewBufferProcessor(SocketChannel socketChannel) {
+
+            BufferProcessor bufferProcessor = new PacketBufferProcessor((id, length, data, from) -> {
+                System.out.print("Packet received from ");
+                try {
+                    if(from.isOpen()) {
+                        System.out.println(from.getRemoteAddress());
+                    } else {
+                        System.out.println("unknown");
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("ID: " + id);
+                System.out.println("Length: " + length);
+                System.out.println("Content as string: " + new String(data.array()));
+            });
+
+            try {
+                map.put(socketChannel.getRemoteAddress(), (PacketBufferProcessor) bufferProcessor);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return bufferProcessor;
         }
     }
 
@@ -70,12 +123,6 @@ public class ServerTester {
                     bytesRemaining = outputBuffer.limit();
                 }
 
-                @Override
-                protected int asynchronousGetBytesRemaining() {
-                    int ret = bytesRemaining;
-                    bytesRemaining = 0;
-                    return ret;
-                }
             };
             try {
                 map.put(socketChannel.getRemoteAddress(), bufferProcessor);
@@ -106,6 +153,11 @@ public class ServerTester {
                 }
 
                 @Override
+                public void setOwnerSocketChannel(SocketChannel socketChannel) {
+
+                }
+
+                @Override
                 public WriteCallback getRegisteredWriteCallback() {
                     return writeCallback;
                 }
@@ -130,17 +182,17 @@ public class ServerTester {
                 }
 
                 @Override
-                public int getBytesRemaining() {
-                    return outputBuffer.limit();
-                }
-
-                @Override
                 public ByteBuffer getOutputBuffer() {
                     return outputBuffer;
                 }
 
                 @Override
                 public void close() {
+
+                }
+
+                @Override
+                public void stop() {
 
                 }
             };
@@ -156,6 +208,7 @@ public class ServerTester {
 
     static TestBufferProcessorProvider testProcessorProvider = new TestBufferProcessorProvider();
     static AsyncBufferProcessorProvider asyncProcessorProvider = new AsyncBufferProcessorProvider();
+    static PacketBufferProcessorProvider packetProcessorProvider = new PacketBufferProcessorProvider();
 
     static ServerEventListener eventListener = new ServerEventListener() {
         @Override

@@ -39,11 +39,11 @@ public abstract class Server implements Runnable, Closeable {
 
     abstract public void registerAcceptable(ServerSocketChannel serverSocketChannel);
 
-    abstract public void close(SelectableChannel selectableChannel, CloseReason closeReason);
+    abstract public void close(SelectableChannel selectableChannel, CloseReason closeReason, boolean flush);
 
-    abstract public void closeAllChannels(CloseReason closeReason, boolean immediately);
+    abstract public void closeAllChannels(CloseReason closeReason, boolean immediately, boolean flush);
 
-    abstract public void closeAfterSelect(CloseReason closeReason) throws IOException;
+    abstract public void closeAfterSelect(CloseReason closeReason, boolean flush) throws IOException;
 
     @Override
     public void run() {

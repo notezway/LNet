@@ -7,6 +7,7 @@ import net.lnet.processor.BufferProcessorProvider;
 
 import java.io.IOException;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
 
@@ -58,6 +59,8 @@ public class NonblockingServer extends Server {
                     write(socketChannel, bufferProcessor);
                 }
             }
+        } else {
+            close(selectionKey.channel(), null, false);
         }
     }
 
@@ -81,17 +84,25 @@ public class NonblockingServer extends Server {
         }
     }
 
-    private void write(SocketChannel socketChannel, BufferProcessor bufferProcessor) {
+    private boolean write(SocketChannel socketChannel, BufferProcessor bufferProcessor) {
+        boolean socketBusy = false;
         bufferProcessor.processOutput();
-        int bytesRemaining = bufferProcessor.getBytesRemaining();
-        if(bytesRemaining > 0) {
-            try {
-                int bytesWritten = socketChannel.write(bufferProcessor.getOutputBuffer());
-                setWriteInterestOp(socketChannel, bytesWritten < bytesRemaining);
-            } catch (IOException e) {
-                getEventListener().onErrorOccurred(e);
+        ByteBuffer outputBuffer = bufferProcessor.getOutputBuffer();
+        if(outputBuffer != null) {
+            int bytesRemaining = outputBuffer.remaining();
+            if (bytesRemaining > 0) {
+                try {
+                    if (socketChannel.isOpen()) {
+                        int bytesWritten = socketChannel.write(outputBuffer);
+                        socketBusy = bytesWritten < bytesRemaining;
+                        setWriteInterestOp(socketChannel, socketBusy);
+                    }
+                } catch (IOException e) {
+                    getEventListener().onErrorOccurred(e);
+                }
             }
         }
+        return !socketBusy;
     }
 
     private void setWriteInterestOp(SocketChannel socketChannel, boolean isInterest) {
@@ -125,6 +136,7 @@ public class NonblockingServer extends Server {
         if(selectionKey != null) {
             BufferProcessor bufferProcessor = getProcessorProvider().getNewBufferProcessor(socketChannel);
             bufferProcessor.registerWriteCallback(() -> NonblockingServer.this.write(socketChannel, bufferProcessor));
+            bufferProcessor.setOwnerSocketChannel(socketChannel);
             selectionKey.attach(bufferProcessor);
         }
     }
@@ -141,7 +153,7 @@ public class NonblockingServer extends Server {
         return tcpNoDelay;
     }
 
-    public void close(SelectableChannel selectableChannel, CloseReason closeReason) {
+    public void close(SelectableChannel selectableChannel, CloseReason closeReason, boolean flush) {
         SelectionKey selectionKey = selectableChannel.keyFor(selector);
         boolean alreadyCanceled = !selectionKey.isValid();
         try {
@@ -151,7 +163,12 @@ public class NonblockingServer extends Server {
         }
         selectionKey.cancel();
         if(selectableChannel instanceof SocketChannel) {
-            ((BufferProcessor) selectionKey.attachment()).close();
+            BufferProcessor bufferProcessor = (BufferProcessor) selectionKey.attachment();
+            if(flush) {
+                bufferProcessor.stop();
+            } else {
+                bufferProcessor.close();
+            }
             SocketChannel socketChannel = (SocketChannel) selectableChannel;
             if(!alreadyCanceled) {
                 getEventListener().onSocketChannelClosed(socketChannel, closeReason);
@@ -159,26 +176,26 @@ public class NonblockingServer extends Server {
         }
     }
 
-    public void closeAllChannels(CloseReason closeReason, boolean immediately) {
+    public void closeAllChannels(CloseReason closeReason, boolean immediately, boolean flush) {
         if(immediately) {
             selector.wakeup();
         }
         synchronized (selector.keys()) {
             for (SelectionKey selectionKey : selector.keys()) {
-                close(selectionKey.channel(), closeReason);
+                close(selectionKey.channel(), closeReason, flush);
             }
         }
     }
 
     @Override
     public void close() throws IOException {
-        closeAllChannels(null, true);
+        closeAllChannels(null, true, false);
         selector.close();
         super.close();
     }
 
-    public void closeAfterSelect(CloseReason closeReason) throws IOException {
-        closeAllChannels(closeReason, false);
+    public void closeAfterSelect(CloseReason closeReason, boolean flush) throws IOException {
+        closeAllChannels(closeReason, false, flush);
         selector.close();
         super.close();
     }

@@ -31,11 +31,15 @@ public class ProcessorTester {
         synchronized (lock) {
             lock.notify();
             s[0] += "2";
-            thread.join();
-            s[0] += "3";
         }
+        s[0] += "3";
+        Thread.yield();
         synchronized (lock) {
             s[0] += "4";
+        }
+        Thread.sleep(1);
+        synchronized (lock) {
+            s[0] += "5";
         }
         Thread.sleep(500);
         System.out.println(s[0]);

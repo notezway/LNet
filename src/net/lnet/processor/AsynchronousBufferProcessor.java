@@ -3,6 +3,7 @@ package net.lnet.processor;
 import net.lnet.WriteCallback;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 
 /**
  * Created by slimon on 20-11-17.
@@ -11,41 +12,57 @@ public abstract class AsynchronousBufferProcessor implements BufferProcessor {
 
     protected final ByteBuffer inputBuffer;
     protected final ByteBuffer outputBuffer;
+
+    protected final Thread inputThread;
+    protected final Thread outputThread;
+
     private WriteCallback writeCallback;
+
+    private SocketChannel owner;
+
     private volatile boolean needStop = false;
+
+    private volatile int writeAttempts;
 
     public AsynchronousBufferProcessor(int buffersCapacity) {
         inputBuffer = ByteBuffer.allocateDirect(buffersCapacity);
         outputBuffer = ByteBuffer.allocateDirect(buffersCapacity);
 
-        Thread inputThread = new Thread(() -> {
+        inputThread = new Thread(() -> {
             synchronized (inputBuffer) {
                 while (!needStop) {
                     try {
                         inputBuffer.wait();
                     } catch (InterruptedException ignored) {
                     } finally {
-                        asynchronousProcessInput();
+                        if(!needStop) {
+                            asynchronousProcessInput();
+                        }
                     }
                 }
             }
         });
 
-        Thread outputThread = new Thread(() -> {
+        outputThread = new Thread(() -> {
             synchronized (outputBuffer) {
                 while (!needStop) {
                     try {
                         outputBuffer.wait();
                     } catch (InterruptedException ignored) {
                     } finally {
-                        if(!needStop) {
+                        while(true) {
                             asynchronousProcessOutput();
-                            initiateOutputWrite();
+                            boolean socketBusy = !writeCallback.write();
+                            writeAttempts--;
+                            if(socketBusy || writeAttempts < 1) break;
                         }
                     }
                 }
             }
         });
+
+        inputThread.setDaemon(true);
+        outputThread.setDaemon(true);
 
         inputThread.start();
         outputThread.start();
@@ -54,8 +71,6 @@ public abstract class AsynchronousBufferProcessor implements BufferProcessor {
     abstract protected void asynchronousProcessInput();
 
     abstract protected void asynchronousProcessOutput();
-
-    abstract protected int asynchronousGetBytesRemaining();
 
     private void notifyInput() {
         synchronized (inputBuffer) {
@@ -70,7 +85,8 @@ public abstract class AsynchronousBufferProcessor implements BufferProcessor {
     }
 
     public void initiateOutputWrite() {
-        writeCallback.write();
+        writeAttempts++;
+        notifyOutput();
     }
 
     public void stop() {
@@ -82,6 +98,15 @@ public abstract class AsynchronousBufferProcessor implements BufferProcessor {
     @Override
     public void registerWriteCallback(WriteCallback writeCallback) {
         this.writeCallback = writeCallback;
+    }
+
+    @Override
+    public void setOwnerSocketChannel(SocketChannel socketChannel) {
+        owner = socketChannel;
+    }
+
+    public SocketChannel getOwner() {
+        return owner;
     }
 
     @Override
@@ -106,18 +131,21 @@ public abstract class AsynchronousBufferProcessor implements BufferProcessor {
         }
     }
 
-    @Override
+    /*@Override
     public int getBytesRemaining() {
         synchronized (outputBuffer) {
             return asynchronousGetBytesRemaining();
         }
-    }
+    }*/
 
     @Override
     public ByteBuffer getOutputBuffer() {
-        synchronized (outputBuffer) {
-            return outputBuffer;
+        if(Thread.currentThread() == outputThread) {
+            synchronized (outputBuffer) {
+                return outputBuffer;
+            }
         }
+        return null;
     }
 
     @Override
